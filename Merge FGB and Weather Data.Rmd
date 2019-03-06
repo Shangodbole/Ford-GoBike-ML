@@ -1,0 +1,78 @@
+---
+title: "Merge Weather Data and FGB Trip Data"
+date: "Last Updated: 3/5/2019"
+output: html_document
+runtime: shiny
+---
+
+``` {r load_base_functions,echo=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo=FALSE,message=FALSE,fig.height=1,figwidth=1,warnings=F)
+```
+
+``` {r load, include=F,echo=F}
+library("lubridate");library("reshape");library("data.table");library("RCurl");library("tidyverse");library("skimr");library("ggplot2");library("lubridate");library("rjson")
+knitr::opts_chunk$set(fig.width = 1, fig.length=1, fig.asp = 1,  message=FALSE)
+```
+
+``` {r HelperFunctions}
+ann=function(x){
+  if (is.matrix(x)){
+    for (i in seq(1,ncol(x))){
+      #z=all(as.numeric(unique(x[,i]))==unique(x[[i]]))
+      z=all(as.numeric(unique(x[,i]))==unlist(lapply(lapply(strsplit(unique(x[,i]),""),function(x) x[x!="" & x!=" "]),function(x)paste(x,collapse=""))))
+      if(!is.na(z) | sum(is.na(as.numeric(x[,i])))==0){
+        if (z){
+          mode(x[,i])='numeric'
+        }
+      }
+    }
+  } else {
+    for (i in seq(1,ncol(x))){
+      #        print(i)
+      z=all(as.numeric(unique(x[[i]]))==unlist(lapply(lapply(strsplit(as.character(unique(x[[i]])),""),function(x) x[x!="" & x!=" "]),function(x)paste(x,collapse=""))))
+      #        z=z | all(as.numeric(as.character(x[[i]]))==as.numeric(as.character(x[[i]])))
+      if (!is.na(z)){
+        yz="0 " %in% x[[i]] | " 0" %in% x[[i]]
+        if (sum(is.na(as.numeric(x[[i]])))==0 | z | yz){
+          if (!(colnames(x)[i] %in% c("Ticket","action","VAR1","Ticket_SN","Smart_Card_SN"))){
+            mode(x[[i]])='numeric'
+          }
+        } 
+        
+      }
+    }
+  }
+  return(x)
+}
+```
+
+### Load Data
+``` {r basic_information, message=F}
+setwd("~/Ford-GoBike-ML/Clean Data")
+list.files()
+sFGB=fread("Summarized FGB.csv")
+hourly=fread("Hourly SF OAK Weather.csv")
+daily=fread("SF Daily Weather.csv")
+```
+
+### Merge Data
+``` {r gendata, message=F}
+colnames(daily)[2]="StartDate"
+sFGB=merge(sFGB,daily,all.x=T)
+sFGB=sFGB[!is.na(sFGB[["Site4"]]),]
+colnames(hourly)[2:3]=c("StartDate","StartHr")
+byv=colnames(hourly)[2:3]
+sFGB[[1]]=ymd(sFGB[[1]])
+hourly[[2]]=ymd(hourly[[2]])
+
+mode(sFGB[[1]])
+mode(sFGB[[4]])
+mode(hourly[[2]])
+mode(hourly[[3]])
+### neeeds work
+sFGB
+sFGB=merge(sFGB,hourly,by=byv,all.x=T)
+
+
+```
+
