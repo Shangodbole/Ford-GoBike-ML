@@ -1,0 +1,95 @@
+---
+title: "Historic Download Weather Data (2017-2018)"
+date: "Last Updated: 3/5/2019"
+output: html_document
+runtime: shiny
+---
+
+``` {r load_base_functions,echo=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo=FALSE,message=FALSE,fig.height=1,figwidth=1,warnings=F)
+```
+
+``` {r load, include=F,echo=F}
+library("lubridate");library("reshape");library("data.table");library("RCurl");library("tidyverse");library("skimr");library("ggplot2");library("lubridate");library("rjson")
+knitr::opts_chunk$set(fig.width = 1, fig.length=1, fig.asp = 1,  message=FALSE)
+```
+
+``` {r HelperFunctions}
+ann=function(x){
+  if (is.matrix(x)){
+    for (i in seq(1,ncol(x))){
+      #z=all(as.numeric(unique(x[,i]))==unique(x[[i]]))
+      z=all(as.numeric(unique(x[,i]))==unlist(lapply(lapply(strsplit(unique(x[,i]),""),function(x) x[x!="" & x!=" "]),function(x)paste(x,collapse=""))))
+      if(!is.na(z) | sum(is.na(as.numeric(x[,i])))==0){
+        if (z){
+          mode(x[,i])='numeric'
+        }
+      }
+    }
+  } else {
+    for (i in seq(1,ncol(x))){
+      #        print(i)
+      z=all(as.numeric(unique(x[[i]]))==unlist(lapply(lapply(strsplit(as.character(unique(x[[i]])),""),function(x) x[x!="" & x!=" "]),function(x)paste(x,collapse=""))))
+      #        z=z | all(as.numeric(as.character(x[[i]]))==as.numeric(as.character(x[[i]])))
+      if (!is.na(z)){
+        yz="0 " %in% x[[i]] | " 0" %in% x[[i]]
+        if (sum(is.na(as.numeric(x[[i]])))==0 | z | yz){
+          if (!(colnames(x)[i] %in% c("Ticket","action","VAR1","Ticket_SN","Smart_Card_SN"))){
+            mode(x[[i]])='numeric'
+          }
+        } 
+        
+      }
+    }
+  }
+  return(x)
+}
+```
+
+### Lookup Hourly Weather Data for San Francisco and Oakland
+``` {r basic_information, message=F}
+dir.create("~/Ford-GoBike-ML/Raw Data")
+dir.create("~/Ford-GoBike-ML/Clean Data")
+setwd("~/Ford-GoBike-ML/Raw Data")
+url="http://www.frontierweather.com/historicaldatasubscribers_hourly.html"
+url2017="http://www.frontierweather.com/historicaldataonly/HourlyData2017.zip"
+url2018="http://www.frontierweather.com/historicaldataonly/HourlyData2018.zip"
+if (!("2017.zip" %in% list.files())){
+  download.file(url2017,destfile=paste0(getwd(),"/2017.zip"))
+  file="2017.zip"
+  unzip(file,exdir=getwd())
+}
+if (!("2018.zip" %in% list.files())){
+  download.file(url2018,destfile=paste0(getwd(),"/2018.zip"))
+  file="2018.zip"
+  unzip(file,exdir=getwd())
+}
+st=fread("http://www.frontierweather.com/SiteList.csv")
+w2018=fread("HourlyData2018.txt")
+w2017=fread("HourlyData2017.txt")
+weather=rbindlist(list(w2017,w2018))
+weather
+st=st[st[["State"]]=="CA",]
+st
+st=st[st[["City"]] %in% c("SAN FRANCISCO","OAKLAND"),]
+st
+sites=as.data.table(st[["Site4"]])
+colnames(sites)="Site"
+sites
+```
+
+### Merge Data
+``` {r gendata, message=F}
+all=merge(sites,weather)
+### Redefine Date
+all[["Date"]]=mdy(unlist(lapply(all[["Date"]],function(x) strsplit(x,"\\ ")[[1]][1])))
+hourly=ann(all)
+setwd("~/Ford-GoBike-ML/Clean Data")
+fwrite(hourly,"Hourly SF OAK Weather.csv")
+
+sfdaily=fread("http://www.frontierweather.com/historicaldataonly/KSFO_daily.txt")
+sfdaily[["Date"]]=mdy(unlist(lapply(sfdaily[["Date"]],function(x) strsplit(x,"\\ ")[[1]][1])))
+sfdaily=ann(as.data.table(as.data.frame(sfdaily)))
+setwd("~/Ford-GoBike-ML/Clean Data")
+fwrite(sfdaily,"SF Daily Weather.csv")
+```
