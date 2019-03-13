@@ -1,10 +1,11 @@
 ---
 title: "Historic Download Weather Data (2017-2018)"
-date: "Last Updated: 3/5/2019"
-output: html_document
-runtime: shiny
+author: "Alec Lepe"
+date: "03/05/2018"
+output: 
+  html_document:
+    keep_md: true
 ---
-
 ``` {r load_base_functions,echo=FALSE,message=FALSE}
 knitr::opts_chunk$set(echo=FALSE,message=FALSE,fig.height=1,figwidth=1,warnings=F)
 ```
@@ -48,9 +49,9 @@ ann=function(x){
 
 ### Lookup Hourly Weather Data for San Francisco and Oakland
 ``` {r basic_information, message=F}
-dir.create("~/Ford-GoBike-ML/Raw Data")
-dir.create("~/Ford-GoBike-ML/Clean Data")
-setwd("~/Ford-GoBike-ML/Raw Data")
+dir.create("~/Desktop/Projects/Ford-GoBike-ML/Raw Data")
+dir.create("~/Desktop/Projects/Ford-GoBike-ML/Clean Data")
+setwd("~/Desktop/Projects/Ford-GoBike-ML/Raw Data")
 url="http://www.frontierweather.com/historicaldatasubscribers_hourly.html"
 url2017="http://www.frontierweather.com/historicaldataonly/HourlyData2017.zip"
 url2018="http://www.frontierweather.com/historicaldataonly/HourlyData2018.zip"
@@ -84,12 +85,12 @@ all=merge(sites,weather)
 ### Redefine Date
 all[["Date"]]=mdy(unlist(lapply(all[["Date"]],function(x) strsplit(x,"\\ ")[[1]][1])))
 hourly=ann(all)
-setwd("~/Ford-GoBike-ML/Clean Data")
+setwd("~/Desktop/Projects/Ford-GoBike-ML/Clean Data")
 fwrite(hourly,"Hourly SF OAK Weather.csv")
 
 sfdaily=fread("http://www.frontierweather.com/historicaldataonly/KSFO_daily.txt")
 sfdaily[["Date"]]=mdy(unlist(lapply(sfdaily[["Date"]],function(x) strsplit(x,"\\ ")[[1]][1])))
 sfdaily=ann(as.data.table(as.data.frame(sfdaily)))
-setwd("~/Ford-GoBike-ML/Clean Data")
+setwd("~/Desktop/Projects/Ford-GoBike-ML/Clean Data")
 fwrite(sfdaily,"SF Daily Weather.csv")
 ```
