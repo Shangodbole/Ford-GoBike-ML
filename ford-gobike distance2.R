@@ -245,6 +245,7 @@ out=merge(out,OriginStations,all.x=T,by='EndStationID')
 save(out,file="FGB Google API Distance and Times.RData")
 fwrite(out,file="FGB Google API Distance and Times.csv")
 
+fwrite(Stations[agrepl("BART",Stations[["name"]]),],"BART Stations.csv")
 
 out
 ### EXTRA CODE
