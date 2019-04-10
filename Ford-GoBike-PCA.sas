@@ -1,9 +1,21 @@
 PROC IMPORT OUT= SumTripWeather 
-            DATAFILE= "Summarized Trip Data and Weather Data.csv"
+            DATAFILE= "Summarized Trip Data (with google api) and Weather Data.csv"
             DBMS=CSV REPLACE;
      GETNAMES=YES;
      DATAROW=2;
+	 *create average weather numbers;
+	 data SumTripWeather;
+	set SumTripWeather; 
+	AvgTemp = mean(KFSOTemperature, KOAKTemperature);
+	AvgDewpoint = mean(KFSODewpoint, KOAKDewpoint);
+	AvgRH = mean(KFSORH, KOAKRH);
+	AvgPrecip = mean(KFSOPrecip, KOAKPrecip);
 	 label
+	 	Count = Bike Count
+	 	AvgTemp = SF and Oak Avg Temp
+		AvgDewpoint = SF and Oak Avg Dewpoint
+		AvgRH = SF and Oak Avg Relative Humidity
+		AvgPrecip = SF and Oak Avg Precip
 		StartDate = Starting Date
 	 	StartDayTypeN = Start Day
 		StartDayType = Starting Day
@@ -18,14 +30,15 @@ PROC IMPORT OUT= SumTripWeather
 		KOAKDewpoint = Oakland Dewpoint
 		KOAKWindspeed = Oakland Windspeed
 		KOAKWindDir = Oakland Wind Direction
-		KFSOWindspeed = San Francisco Windspeed
-		KFSOWindDir = San Francisco Direction
+		KFSOWindspeed = San Francisco Wind Windspeed
+		KFSOWindDir = San Francisco Wind Direction
 		KOAKRH = Oakland Relative Humidity
 		KFSORH = San Francisco Relative Humidity
 		KOAKCldFrac = Oakland fraction of sky covered
 		KFSOCldFrac = San Francisco fraction of sky covered
 		KFSOMSLP = San Francisco Mean Sea Level Pressure
 		KOAKMSLP = Oakland Mean Sea Level Pressure
+		
 ;
 run;
 
@@ -113,22 +126,14 @@ If Count =<0 then Count=0;
 *Use LogCount to help with visualization;
 LogCount = log(Count+1);
 If LogCount =<1 then LogCount=.;
+
 RUN;
-
-
-*Sort and print data to help find missing entries;
-PROC SORT data = SumTripWeather;
-by KOAKWindDir;
-run;
-Proc Print data=SumTripWeather (obs=100);
-run;
-
 
 *Some data exploration;
 PROC SORT data = SumTripWeather;
 by StartHr;
 run;
-title 'Shares Per Hours';
+title 'Shares By Starting Hours';
 proc boxplot data=SumTripWeather;
    plot LogCount*StartHr;
    inset min mean max stddev /
@@ -175,117 +180,113 @@ proc boxplot data=SumTripWeather;
       header = 'Extremes by Starting City';
 run;
 
-*title ;
-*proc univariate data=SumTripWeather;
-*  histogram;
-*run;
-
-
-*StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindspeed KFSOCldFrac 
-KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
-
-
-
 *SAS code for first run
 principal components factor analysis
 no rotation
 all output printed
-SAS select m the number of factors;
-title ;
-proc factor data=SumTripWeather
-			method=prin
+SAS MINEIGEN=.7 to select the number of factors;
+title 'First PCA Using All Variables';
+proc factor data=SumTripWeather corr scree ev
+			method=principal
+			MINEIGEN=.7
 			REORDER
-			ROUND
-			rotate=none;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+			rotate=none
+			FLAG=.50;
+VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
 run;
 
-*9 factors
-varimax rotation
-plotting the factor loadings
-before and after rotation;
-proc factor data=SumTripWeather
-			m=prin
-			NFACTORS=9
-			rotate=v
+*SAS code for run with avg weather numbers and StartDate due to cor with StartYear
+principal components factor analysis
+no rotation
+all output printed
+SAS select NFACTORS=8 the number of factors
+heywood permits iteration to continue if the estimated uniqueness of a variable drops below 0;
+title 'PCA Using 15 Variables';
+proc factor data=SumTripWeather corr scree ev SIMPLE
+			method=principal
+			NFACTORS=8
+			round
+			REORDER
+			FLAG=.40
+			rotate=Varimax
 			preplot
-			plot all;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+			plot all
+			heywood
+			OUT=PCATripWeather;;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
 
-*iterated principal factor analysis with varimax rotation.
-The option heywood permits iteration to continue if the estimated uniqueness of a variable drops below 0;
-proc factor data=SumTripWeather m=prinit NFACTORS=10 rotate=v preplot plot all heywood;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
-run;
 
 *maximum likelihood;
 title ;
-proc factor data=SumTripWeather m=ml NFACTORS=10 ROTATE=VARIMAX preplot plot all heywood;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+proc factor data=SumTripWeather m=ml NFACTORS=8 ROTATE=VARIMAX preplot plot all heywood;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
-
 
 *Main Test;
 proc factor data=SumTripWeather
 			SIMPLE
 			METHOD=PRIN
-			MINEIGEN=1
+			MINEIGEN=.7
 			SCREE
 			REORDER
 			ROUND
 			ROTATE=VARIMAX
 			FLAG=.50;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
 proc factor data=SumTripWeather
 			simple
 			METHOD=PRIN
 			COV
 			PRIORS=ONE
-			NFACTORS=9
+			NFACTORS=8
 			SCREE
 			REORDER
 			ROUND
 			FLAG=.50
 			ROTATE=VARIMAX
 			OUT=PCATripWeather;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
+
 proc corr data=PCATripWeather;
-	var Factor1 Factor2 Factor3 Factor4 Factor5 Factor6 Factor7 Factor8 Factor9;
-	with StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip Factor1 Factor2 Factor3 Factor4 Factor5 Factor6 Factor7 Factor8 Factor9;
+	var Factor1 Factor2 Factor3 Factor4 Factor5 Factor6 Factor7 Factor8;
+	with StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
 
 ods graphics on;
-proc princomp data=SumTripWeather (drop=LogCount) COV n=4 standard plots=patternprofile out=PCATripWeather;
+proc princomp data=SumTripWeather (drop=LogCount) COV n=8 standard plots=patternprofile out=PCATripWeather;
 run;
 ods graphics off;
 
 *Plot Factor1 vs. Factor2 PC;
 proc gplot;	
-axis1 length=10 in;
-axis2 length=10 in;
-plot Factor1*Factor2 / vaxis=axis1 haxis=axis2;
+axis1 length=5.5 in;
+axis2 length=5.5 in;
+plot Prin1*Prin2 / vaxis=axis1 haxis=axis2;
 symbol v=J f=special h=2 i=none color=black;
 run;
+quit;
 
 
-proc pls data=SumTripWeather method=PCR nfac=5; /* PCR onto 5 factors */
-   model StartHr = StartDate StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip / solution;
+
+*Use PROC PLS for principal component regression;
+proc pls data=SumTripWeather method=PCR nfac=8; /* PCR onto 8 factors */
+   model Count = StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 run;
 
 
 
 /* Keep the first 1000 observations for scoring. 
- Compute the two first principal components on the rest */
-proc princomp data=SumTripWeather(firstobs=1001) n=5 cov;
-VAR StartDate StartHr StartCityN EndCityN StartMonthLabelN StartYear StartDayTypeN Count KFSOTemperature KFSODewpoint KFSORH KFSOWindspeed KFSOCldFrac KFSOMSLP KFSOWeatherN KFSOPrecip KOAKTemperature KOAKDewpoint KOAKRH KOAKWindspeed KOAKCldFrac KOAKMSLP KOAKWeatherN KOAKPrecip;
+ Compute the Eight first principal components on the rest */
+proc princomp data=SumTripWeather(firstobs=1001) n=8 cov;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
 ods output Eigenvectors=EV;
 run;
 
 proc transpose data=ev out=evTransposed;
-var Prin1 Prin2 Prin3 Prin4 Prin5;
+var Prin1 Prin2 Prin3 Prin4 Prin5 Prin6 Prin7 Prin8;
 id Variable;
 run;
 
@@ -296,5 +297,9 @@ run;
 
 /* Compute the first two component scores for the 
  first 1000 observations */
-proc score data=SumTripWeather(obs=1000) score=prinScore out=scoredTripWeather; 
+proc score data=SumTripWeather(obs=1000) score=prinScore out=scoredTripWeather;
+VAR StartDate StartHr Count AvgTemp AvgDewpoint AvgRH AvgPrecip KFSOWindDir KFSOWindspeed KFSOCldFrac KFSOMSLP KOAKWindDir KOAKWindspeed KOAKCldFrac KOAKMSLP;
+run;
+
+proc print data=scoredTripWeather;
 run;
